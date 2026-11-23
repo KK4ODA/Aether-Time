@@ -67,7 +67,7 @@ VIAddVersionKey "LegalCopyright" "Copyright (C) 2026 KK4ODA and contributors. GP
 !define MUI_LICENSEPAGE_TEXT_TOP "${APP} is free software under the GNU General Public License."
 !define MUI_LICENSEPAGE_TEXT_BOTTOM "You don't need to accept this license to use the program. It sets out your rights to share and change it."
 !define MUI_LICENSEPAGE_BUTTON "$(^NextBtn)"
-!insertmacro MUI_PAGE_LICENSE "../LICENSE"
+!insertmacro MUI_PAGE_LICENSE "..\LICENSE"
 
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
@@ -139,9 +139,9 @@ Section "${APP} (required)" SecMain
   !else
     File "/oname=${EXE}" "${EXE_AMD64}"
   !endif
-  File "../LICENSE"
-  File "../README.md"
-  File "../THIRD_PARTY_NOTICES.md"
+  File "..\LICENSE"
+  File "..\README.md"
+  File "..\THIRD_PARTY_NOTICES.md"
   Delete /REBOOTOK "$INSTDIR\${EXE}.old"
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
