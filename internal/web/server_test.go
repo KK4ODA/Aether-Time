@@ -125,3 +125,16 @@ func TestInvalidConfigRejected(t *testing.T) {
 		t.Fatalf("%d %s", w.Code, w.Body.String())
 	}
 }
+
+// The tray and CLI on the same computer don't need the network password, but
+// a DNS-rebinding page (loopback address, foreign Host) still does.
+func TestLocalClientsSkipPassword(t *testing.T) {
+	s, _ := newTestServer("0.0.0.0:8123", "s3cret")
+	h := s.Handler()
+	if w := do(h, "GET", "/api/status", "127.0.0.1:8123", nil, ""); w.Code != 200 {
+		t.Fatalf("local client: %d", w.Code)
+	}
+	if w := do(h, "GET", "/api/status", "rebind.attacker.example:8123", nil, ""); w.Code != 401 {
+		t.Fatalf("rebinding request: %d", w.Code)
+	}
+}

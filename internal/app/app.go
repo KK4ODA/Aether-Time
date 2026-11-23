@@ -9,7 +9,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -22,6 +21,7 @@ import (
 	"github.com/KK4ODA/Aether-Time/internal/logbuf"
 	"github.com/KK4ODA/Aether-Time/internal/sources"
 	"github.com/KK4ODA/Aether-Time/internal/svc"
+	"github.com/KK4ODA/Aether-Time/internal/tray"
 	"github.com/KK4ODA/Aether-Time/internal/updater"
 	"github.com/KK4ODA/Aether-Time/internal/version"
 	"github.com/KK4ODA/Aether-Time/internal/web"
@@ -149,7 +149,7 @@ func (a *App) Run(ctx context.Context) error {
 	if a.opts.OpenBrowser {
 		go func() {
 			if srv.WaitReady(10 * time.Second) {
-				openBrowser(srv.URL())
+				tray.OpenURL(srv.URL())
 			}
 		}()
 	}
@@ -350,8 +350,10 @@ func (a *App) InstallService() error {
 		for i := 0; i < 60; i++ {
 			time.Sleep(2 * time.Second)
 			if svc.Status() == "running" && !a.opts.Service {
-				a.log.Info("the Aether Time service is running; this window hands over to it")
+				a.log.Info("the Aether Time service is running; handing over to it")
+				// Restarting makes this program come back as a tray icon for the service.
 				a.mu.Lock()
+				a.restart = true
 				cancel := a.shutdown
 				a.mu.Unlock()
 				if cancel != nil {
@@ -379,17 +381,4 @@ func (a *App) Info() web.Info {
 		SerialPorts:   sources.SerialPorts(),
 		AllTxt:        sources.AllTxtCandidates(),
 	}
-}
-
-func openBrowser(url string) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	default:
-		cmd = exec.Command("xdg-open", url)
-	}
-	_ = cmd.Start()
 }

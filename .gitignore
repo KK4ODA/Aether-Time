@@ -3,3 +3,6 @@
 /aether-time.exe
 *.test
 *.out
+
+# Release signing keys must never be committed.
+*.secret

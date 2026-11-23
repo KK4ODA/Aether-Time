@@ -326,7 +326,8 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 //   - Requests that change something must carry the X-Aether header and, if
 //     the browser sends an Origin, it must be this server. Other web sites
 //     cannot add custom headers without a CORS preflight, which we never grant.
-//   - A password (HTTP Basic auth) is required when listening on the network.
+//   - A password (HTTP Basic auth) is required when listening on the network,
+//     except for programs on this computer that address it as localhost.
 func (s *Server) secure(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
@@ -337,7 +338,11 @@ func (s *Server) secure(next http.Handler) http.Handler {
 			httpError(w, http.StatusForbidden, "forbidden host")
 			return
 		}
-		if cfg.Password != "" && !(loopback && isLoopbackRemote(r.RemoteAddr)) {
+		// Programs on this computer (the tray icon, the CLI) don't need the
+		// password. Requiring a loopback Host as well keeps DNS-rebinding web
+		// pages out.
+		local := isLoopbackRemote(r.RemoteAddr) && loopbackHost(r.Host)
+		if cfg.Password != "" && !local {
 			_, pw, ok := r.BasicAuth()
 			if !ok || subtle.ConstantTimeCompare([]byte(pw), []byte(cfg.Password)) != 1 {
 				w.Header().Set("WWW-Authenticate", `Basic realm="Aether Time"`)

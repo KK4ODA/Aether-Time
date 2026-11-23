@@ -38,6 +38,8 @@ It brings together what operators use JTSync and BktTimeSync for, and adds:
 | Max correction limit, ignore GPS date | | yes | yes |
 | On-screen clock | | yes, BktClock | yes, full-screen wall clock page |
 | Sync log | | yes | yes, CSV |
+| Tray icon | | yes | yes, with the sync state as a coloured badge |
+| Start with the computer | | yes | yes, as a service, plus a login item for the icon |
 | Update check | | yes, notifies | yes, signed automatic install |
 | Web time over HTTPS (works where NTP is blocked) | | | yes |
 | gpsd with PPS (sub-millisecond) | | | yes |
@@ -71,12 +73,35 @@ empty cell means the feature isn't mentioned there.
    sudo ./aether-time service install --start
    ```
 
-3. Open the dashboard at <http://127.0.0.1:8123/>. On Windows you can instead
-   double-click `aether-time.exe` and use **Install service** on the dashboard;
-   Windows asks for permission once.
+3. Start `aether-time` from your desktop (double-click it on Windows). An icon
+   appears in the system tray or menu bar; choose **Start at login** in its
+   menu to keep it there. The dashboard is at <http://127.0.0.1:8123/>.
+
+On Windows you can skip step 2: double-click `aether-time.exe` and use
+**Install service** on the dashboard. Windows asks for permission once.
 
 Running `aether-time` without the service also works, but it can only measure
 until it's started as administrator or root.
+
+### The tray icon
+
+The badge on the clock shows the state at a glance: green when synchronized,
+amber while correcting (or when the clock can't be changed), blue in holdover,
+red with no time source, and grey when Aether Time isn't running. Hover for
+the current clock error. The menu opens the dashboard or the wall clock, syncs
+now, switches to measuring only, installs a waiting update, and turns
+**Start at login** on or off.
+
+The service has no access to your desktop, so the icon runs as a small
+separate program in your session and talks to the service. Starting
+`aether-time` while the service runs shows just the icon; without the service,
+the same program also does the time keeping.
+
+- Linux: works with KDE, XFCE, Cinnamon, MATE and others. GNOME needs the
+  "AppIndicator and KStatusNotifierItem Support" extension (Ubuntu ships it).
+  Without a desktop (a headless Raspberry Pi, SSH) the icon is skipped.
+- macOS: the menu-bar icon needs Apple's toolchain, so it's included in builds
+  made on a Mac, which is how the release workflow builds them.
 
 ### Connect WSJT-X, JTDX or MSHV
 
@@ -132,6 +157,8 @@ serial GPS it's a few milliseconds. With PPS it's under a millisecond.
 ```text
 aether-time                      start and open the dashboard
 aether-time run --monitor        measure only, never change the clock
+aether-time run --no-tray        no tray icon
+aether-time tray                 only the tray icon, for the running service
 aether-time sync [--dry-run]     one-shot NTP sync, like ntpdate
 aether-time status               state of the running instance
 aether-time service install --start | uninstall | start | stop | restart | status
@@ -165,21 +192,40 @@ git push origin v0.1.0
 
 Tags with a suffix such as `v0.2.0-beta.1` go to the beta channel.
 
-To turn on signature checking, which is strongly recommended, do this once:
+### Signed updates
 
-1. Generate a key pair and write the public key into the source tree:
+Set this up once, before the first public release, on your own computer (it
+needs Git and Go 1.24 or newer):
+
+1. In the repository folder, create the key pair:
 
    ```bash
-   go run ./cmd/aether-sign keygen -write internal/updater/signing_key.pub
+   go run ./cmd/aether-sign keygen
    ```
 
-2. Save the printed private key as a repository secret named
-   `AETHER_SIGNING_KEY` (**Settings → Secrets and variables → Actions**).
-3. Commit `signing_key.pub`.
+   The private key goes to `aether-signing-key.secret` (git-ignored, never
+   printed). The public key goes into `internal/updater/signing_key.pub`.
+2. Store the private key as the repository secret `AETHER_SIGNING_KEY`, either
+   with the GitHub CLI or by pasting the file's contents under
+   **Settings → Secrets and variables → Actions → New repository secret**:
 
-Every build after that refuses updates that aren't signed with your key. If the
-public key is committed but the secret is missing, the release workflow stops
-instead of publishing an unsigned release.
+   ```bash
+   gh secret set AETHER_SIGNING_KEY < aether-signing-key.secret
+   ```
+
+3. Keep a copy of the file's contents in your password manager, then delete
+   the file.
+4. Commit and push `internal/updater/signing_key.pub`.
+
+Every build after that refuses updates that aren't signed with your key. The
+release workflow checks that the secret matches the committed public key, and
+stops rather than publish an unsigned release. For extra protection, add
+yourself as a required reviewer of the `release` environment
+(**Settings → Environments**) so the key is only used after you approve a run.
+
+If the private key is ever lost, run `keygen -force` to make a new pair. Copies
+already installed won't accept releases signed with the new key, so their
+users update by hand once.
 
 ## Building from source
 
@@ -194,17 +240,19 @@ go build ./cmd/aether-time
 ```
 
 ```bash
-scripts/build.sh 0.1.0
+scripts/build.sh 0.1.0 && scripts/checksums.sh
 ```
 
-`scripts/build.sh` cross-compiles every platform into `dist/` along with
-`checksums.txt`.
+`scripts/build.sh` cross-compiles every platform into `dist/`, and
+`scripts/checksums.sh` writes `dist/checksums.txt`. macOS builds include the
+menu-bar icon only when built on a Mac.
 
 ## Not done yet
 
 - Trimble TSIP receivers. NMEA output works with most receivers, including
   Trimble units set to NMEA.
-- A system tray icon. Bookmark the dashboard or open the wall clock page.
+- Pop-up notifications on each correction. The tray badge and the dashboard
+  show the state instead.
 - Signed installers. Windows SmartScreen and macOS Gatekeeper warn about
   unsigned downloads until code-signing certificates are added to the release
   workflow.

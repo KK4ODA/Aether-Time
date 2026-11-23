@@ -1,11 +1,13 @@
 // Command aether-sign manages the Ed25519 key that signs Aether Time releases.
 //
-//	aether-sign keygen [-write internal/updater/signing_key.pub]
-//	    Creates a key pair. Store the private key as the AETHER_SIGNING_KEY
-//	    repository secret; commit the public key so it is built into the app.
-//	aether-sign sign FILE        (private key in $AETHER_SIGNING_KEY)
-//	    Writes FILE.sig.
-//	aether-sign verify FILE      (public key from internal/updater/signing_key.pub or -pub)
+//	aether-sign keygen
+//	    Creates a key pair. The private key goes to aether-signing-key.secret
+//	    (never printed, never committed); the public key goes to
+//	    internal/updater/signing_key.pub, which is built into the app.
+//	aether-sign sign [-key FILE] FILE
+//	    Writes FILE.sig. The private key comes from -key or $AETHER_SIGNING_KEY.
+//	aether-sign verify [-pub KEY] FILE
+//	    Checks FILE.sig against the committed public key.
 package main
 
 import (
@@ -18,6 +20,8 @@ import (
 	"os"
 	"strings"
 )
+
+const defaultPub = "internal/updater/signing_key.pub"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -41,63 +45,107 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: aether-sign keygen [-write PUBFILE] | sign FILE | verify [-pub KEY] FILE")
+	fmt.Fprintln(os.Stderr, "usage: aether-sign keygen [-out FILE] [-pub FILE] | sign [-key FILE] FILE | verify [-pub KEY] FILE")
 	os.Exit(2)
 }
 
 func keygen(args []string) error {
 	fs := flag.NewFlagSet("keygen", flag.ExitOnError)
-	write := fs.String("write", "", "write the public key to this file")
+	out := fs.String("out", "aether-signing-key.secret", "file that receives the PRIVATE key")
+	pubPath := fs.String("pub", defaultPub, "file that receives the public key built into the app")
+	force := fs.Bool("force", false, "replace an existing public key (only if the old private key is lost)")
 	fs.Parse(args)
+
+	if b, err := os.ReadFile(*pubPath); err == nil && strings.TrimSpace(string(b)) != "" && !*force {
+		return fmt.Errorf("%s already holds a public key. Installed copies only accept updates signed with its private key, "+
+			"so replacing it means users must update by hand once. Re-run with -force only if the old private key is lost", *pubPath)
+	}
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return err
 	}
-	pubB64 := base64.StdEncoding.EncodeToString(pub)
-	fmt.Println("Private key (store as the AETHER_SIGNING_KEY secret; never commit it):")
-	fmt.Println(base64.StdEncoding.EncodeToString(priv))
-	fmt.Println()
-	fmt.Println("Public key:")
-	fmt.Println(pubB64)
-	if *write != "" {
-		if err := os.WriteFile(*write, []byte(pubB64+"\n"), 0o644); err != nil {
-			return err
-		}
-		fmt.Println("\nPublic key written to", *write)
+	// O_EXCL: never overwrite a private key that might be the only copy.
+	f, err := os.OpenFile(*out, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fmt.Errorf("cannot create %s: %w", *out, err)
 	}
+	if _, err := f.WriteString(base64.StdEncoding.EncodeToString(priv) + "\n"); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	pubB64 := base64.StdEncoding.EncodeToString(pub)
+	if err := os.WriteFile(*pubPath, []byte(pubB64+"\n"), 0o644); err != nil {
+		return err
+	}
+	fmt.Printf(`Signing key created.
+
+  Private key: %s   (keep it secret; it is git-ignored)
+  Public key:  %s
+               %s
+
+Next steps:
+  1. Store the private key as the GitHub secret AETHER_SIGNING_KEY:
+       gh secret set AETHER_SIGNING_KEY < %s
+     or paste the file's contents under Settings → Secrets and variables → Actions.
+  2. Save a copy in your password manager, then delete %s.
+  3. Commit the public key:
+       git add %s && git commit -m "Add release signing key" && git push
+`, *out, *pubPath, pubB64, *out, *out, *pubPath)
 	return nil
 }
 
-func sign(args []string) error {
-	if len(args) != 1 {
-		usage()
+func loadPrivate(keyFile string) (ed25519.PrivateKey, error) {
+	raw := os.Getenv("AETHER_SIGNING_KEY")
+	if keyFile != "" {
+		b, err := os.ReadFile(keyFile)
+		if err != nil {
+			return nil, err
+		}
+		raw = string(b)
 	}
-	raw := strings.TrimSpace(os.Getenv("AETHER_SIGNING_KEY"))
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return errors.New("AETHER_SIGNING_KEY is not set")
+		return nil, errors.New("no private key: pass -key FILE or set AETHER_SIGNING_KEY")
 	}
 	key, err := base64.StdEncoding.DecodeString(raw)
 	if err != nil || len(key) != ed25519.PrivateKeySize {
-		return errors.New("AETHER_SIGNING_KEY is not a base64 Ed25519 private key")
+		return nil, errors.New("the private key is not a base64 Ed25519 key made by 'aether-sign keygen'")
 	}
-	data, err := os.ReadFile(args[0])
+	return ed25519.PrivateKey(key), nil
+}
+
+func sign(args []string) error {
+	fs := flag.NewFlagSet("sign", flag.ExitOnError)
+	keyFile := fs.String("key", "", "private key file (default: $AETHER_SIGNING_KEY)")
+	fs.Parse(args)
+	if fs.NArg() != 1 {
+		usage()
+	}
+	key, err := loadPrivate(*keyFile)
 	if err != nil {
 		return err
 	}
-	sig := ed25519.Sign(ed25519.PrivateKey(key), data)
-	return os.WriteFile(args[0]+".sig", []byte(base64.StdEncoding.EncodeToString(sig)+"\n"), 0o644)
+	data, err := os.ReadFile(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	sig := ed25519.Sign(key, data)
+	return os.WriteFile(fs.Arg(0)+".sig", []byte(base64.StdEncoding.EncodeToString(sig)+"\n"), 0o644)
 }
 
 func verify(args []string) error {
 	fs := flag.NewFlagSet("verify", flag.ExitOnError)
-	pubFlag := fs.String("pub", "", "base64 public key (default: internal/updater/signing_key.pub)")
+	pubFlag := fs.String("pub", "", "base64 public key (default: "+defaultPub+")")
 	fs.Parse(args)
 	if fs.NArg() != 1 {
 		usage()
 	}
 	pubB64 := *pubFlag
 	if pubB64 == "" {
-		b, err := os.ReadFile("internal/updater/signing_key.pub")
+		b, err := os.ReadFile(defaultPub)
 		if err != nil {
 			return err
 		}
@@ -105,7 +153,7 @@ func verify(args []string) error {
 	}
 	pub, err := base64.StdEncoding.DecodeString(strings.TrimSpace(pubB64))
 	if err != nil || len(pub) != ed25519.PublicKeySize {
-		return errors.New("invalid public key")
+		return errors.New("invalid or missing public key")
 	}
 	data, err := os.ReadFile(fs.Arg(0))
 	if err != nil {
@@ -117,7 +165,7 @@ func verify(args []string) error {
 	}
 	sig, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(sigB64)))
 	if err != nil || !ed25519.Verify(ed25519.PublicKey(pub), data, sig) {
-		return errors.New("signature INVALID")
+		return errors.New("signature INVALID: the secret does not match the committed public key")
 	}
 	fmt.Println("signature OK")
 	return nil

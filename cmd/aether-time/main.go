@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -27,6 +28,7 @@ import (
 	"github.com/KK4ODA/Aether-Time/internal/fusion"
 	"github.com/KK4ODA/Aether-Time/internal/ntp"
 	"github.com/KK4ODA/Aether-Time/internal/svc"
+	"github.com/KK4ODA/Aether-Time/internal/tray"
 	"github.com/KK4ODA/Aether-Time/internal/updater"
 	"github.com/KK4ODA/Aether-Time/internal/version"
 )
@@ -39,6 +41,8 @@ Usage:
       --config PATH               configuration file (default: %s)
       --monitor                   measure only, never change the clock
       --no-browser                do not open the dashboard
+      --no-tray                   do not show the system tray icon
+  aether-time tray                show only the tray icon (for use with the service)
   aether-time sync [--dry-run]    one-shot sync from the configured NTP servers
   aether-time status              show the state of the running instance
   aether-time service install [--start] | uninstall | start | stop | restart | status
@@ -60,6 +64,8 @@ func main() {
 		err = cmdRun(args)
 	case "service":
 		err = cmdService(args)
+	case "tray":
+		err = cmdTray(args)
 	case "sync":
 		err = cmdSync(args)
 	case "status":
@@ -88,6 +94,7 @@ func cmdRun(args []string) error {
 	cfgPath := fs.String("config", config.ConfigPath(), "configuration file")
 	monitor := fs.Bool("monitor", false, "measure only, never change the clock")
 	noBrowser := fs.Bool("no-browser", false, "do not open the dashboard in a browser")
+	noTray := fs.Bool("no-tray", false, "do not show the system tray icon")
 	fs.Parse(args)
 
 	cfg, err := config.Load(*cfgPath)
@@ -96,12 +103,28 @@ func cmdRun(args []string) error {
 	}
 	restarted := os.Getenv("AETHER_TIME_RESTARTED") == "1"
 	openUI := cfg.Web.OpenBrowser && !*noBrowser && !restarted
+	useTray := !*noTray && tray.Supported()
+	releaseLock := func() {}
+	if useTray {
+		release, ok := tray.Lock()
+		if ok {
+			releaseLock = release
+		} else {
+			useTray = false // another tray icon is already showing for this user
+		}
+	}
+	defer releaseLock()
 
-	// If the service (or another copy) is already running, just show its dashboard.
+	// If the service (or another copy) is already running, show its dashboard
+	// and, on a desktop, a tray icon connected to it.
 	if url, ok := runningInstance(cfg.Web.Listen); ok {
 		fmt.Println("Aether Time is already running:", url)
 		if openUI {
-			openBrowser(url)
+			tray.OpenURL(url)
+		}
+		if useTray {
+			tray.DetachOwnConsole()
+			tray.Run(tray.Options{BaseURL: url})
 		}
 		return nil
 	}
@@ -112,11 +135,56 @@ func cmdRun(args []string) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	err = a.Run(ctx)
+	if !useTray {
+		err = a.Run(ctx)
+	} else {
+		// The tray needs the main goroutine (macOS); the engine runs beside it.
+		tray.DetachOwnConsole()
+		errc := make(chan error, 1)
+		go func() {
+			errc <- a.Run(ctx)
+			tray.Quit()
+		}()
+		tray.Run(tray.Options{BaseURL: dashboardURL(cfg.Web.Listen), InProcess: true, OnQuit: stop})
+		stop()
+		err = <-errc
+	}
 	if errors.Is(err, app.ErrRestart) {
+		releaseLock()
 		return reexec()
 	}
 	return err
+}
+
+// cmdTray shows only the tray icon, connected to the running service.
+func cmdTray(args []string) error {
+	fs := flag.NewFlagSet("tray", flag.ExitOnError)
+	cfgPath := fs.String("config", config.ConfigPath(), "configuration file")
+	fs.Parse(args)
+	if !tray.Supported() {
+		return errors.New("no system tray is available in this session")
+	}
+	release, ok := tray.Lock()
+	if !ok {
+		return errors.New("the tray icon is already running")
+	}
+	defer release()
+	cfg, _ := config.Load(*cfgPath)
+	tray.DetachOwnConsole()
+	tray.Run(tray.Options{BaseURL: dashboardURL(cfg.Web.Listen)})
+	return nil
+}
+
+// dashboardURL turns a listen address into a URL usable from this machine.
+func dashboardURL(listen string) string {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return "http://127.0.0.1:8123/"
+	}
+	if ip := net.ParseIP(host); host == "" || ip == nil || ip.IsUnspecified() {
+		host = "127.0.0.1"
+	}
+	return "http://" + net.JoinHostPort(host, port) + "/"
 }
 
 // reexec replaces this process with the (updated) executable.
@@ -138,11 +206,7 @@ func reexec() error {
 }
 
 func runningInstance(listen string) (string, bool) {
-	host := strings.TrimPrefix(listen, "0.0.0.0")
-	if strings.HasPrefix(host, ":") {
-		host = "127.0.0.1" + host
-	}
-	url := "http://" + host + "/"
+	url := dashboardURL(listen)
 	c := http.Client{Timeout: 700 * time.Millisecond}
 	resp, err := c.Get(url + "api/ping")
 	if err != nil {
@@ -374,17 +438,4 @@ func cmdConfig(args []string) error {
 	b, _ := json.MarshalIndent(cfg, "", "  ")
 	fmt.Println(string(b))
 	return nil
-}
-
-func openBrowser(url string) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	case "darwin":
-		cmd = exec.Command("open", url)
-	default:
-		cmd = exec.Command("xdg-open", url)
-	}
-	_ = cmd.Start()
 }

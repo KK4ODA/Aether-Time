@@ -6,10 +6,10 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,19 +17,63 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test ./...
-      - run: scripts/build.sh "${GITHUB_REF_NAME#v}"
+
+  build:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          # Windows and Linux cross-compile from Linux.
+          - runner: ubuntu-latest
+            targets: linux/amd64 linux/arm64 linux/arm windows/amd64 windows/arm64
+          # The macOS menu-bar icon needs Apple's toolchain.
+          - runner: macos-latest
+            targets: darwin/arm64 darwin/amd64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: scripts/build.sh "${GITHUB_REF_NAME#v}" ${{ matrix.targets }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.runner }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # Optional protection: add required reviewers to the "release" environment
+    # (Settings → Environments) so the signing key is only used after approval.
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+      - run: scripts/checksums.sh
       - name: Sign checksums
         env:
           AETHER_SIGNING_KEY: ${{ secrets.AETHER_SIGNING_KEY }}
         run: |
           if [ -n "$AETHER_SIGNING_KEY" ]; then
             go run ./cmd/aether-sign sign dist/checksums.txt
+            # Proves the secret matches the public key built into the app.
             go run ./cmd/aether-sign verify dist/checksums.txt
           elif [ -s internal/updater/signing_key.pub ]; then
             echo "::error::A signing public key is committed but the AETHER_SIGNING_KEY secret is missing; installed copies would refuse this release."
             exit 1
           else
-            echo "::warning::Release is unsigned. Run 'go run ./cmd/aether-sign keygen' to enable signed updates."
+            echo "::warning::Release is unsigned. See README, 'Signed updates', to turn on signing."
           fi
       - name: Publish
         env:
