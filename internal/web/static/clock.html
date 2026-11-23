@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aether Time wall clock</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<style>
+  body { background: var(--window); color: var(--window-ink); min-height: 100vh; display: grid; place-items: center; cursor: default; }
+  .wall { width: min(96vw, 1400px); display: grid; gap: 3vh; text-align: center; }
+  .wall .time { font-size: clamp(4rem, 19vw, 17rem); }
+  .wall .sub { display: flex; justify-content: center; gap: 4vw; flex-wrap: wrap; font-size: clamp(1rem, 2.4vw, 1.8rem); color: var(--window-dim); }
+  .wall .sub strong { color: var(--window-ink); font-weight: 400; }
+  .bar { height: 14px; border-radius: 7px; background: var(--window-line); overflow: hidden; }
+  .bar div { height: 100%; width: 0; background: var(--lamp); }
+  .bar div.tx { background: var(--bad); }
+  .foot-line { display: flex; justify-content: space-between; color: var(--window-dim); font-size: clamp(.9rem, 1.6vw, 1.2rem); }
+  .lampline { display: inline-flex; align-items: center; gap: .5em; }
+  a.back { position: fixed; top: 12px; left: 16px; color: var(--window-dim); text-decoration: none; font-size: .9rem; }
+</style>
+</head>
+<body>
+<a class="back" href="/">Dashboard</a>
+<div class="wall">
+  <p class="time" id="t">--:--:--</p>
+  <div class="sub"><span><strong id="d"></strong> UTC</span><span id="l"></span></div>
+  <div>
+    <div class="bar" aria-hidden="true"><div id="bar"></div></div>
+    <div class="foot-line"><span id="p">FT8 period</span><span class="lampline"><span class="lamp" id="lamp"></span><span id="s">Connecting</span></span></div>
+  </div>
+</div>
+<script>
+"use strict";
+let S = null, skew = 0, init = false;
+const pad = (n) => String(n).padStart(2, "0");
+const now = () => Date.now() + skew + (S && S.engine.offset_ms != null ? S.engine.offset_ms : 0);
+const es = new EventSource("/api/events");
+es.onmessage = (ev) => {
+  S = JSON.parse(ev.data);
+  const sample = Date.parse(S.engine.system_time.replace(/(\.\d{3})\d+/, "$1")) - Date.now();
+  if (!init || Math.abs(sample - skew) > 2000) { skew = sample; init = true; } else skew += (sample - skew) * 0.2;
+  const e = S.engine;
+  const map = { synced: ["ok", "Synchronized"], tracking: ["warn", "Correcting"], holdover: ["hold", "Holdover"], "no-reference": ["bad", "No time source"] };
+  const [cls, txt] = map[e.state] || ["", "Starting"];
+  document.getElementById("lamp").className = "lamp " + cls;
+  let s = txt;
+  if (e.error_ms != null) s += `, ±${e.error_ms < 10 ? e.error_ms.toFixed(1) : Math.round(e.error_ms)} ms`;
+  document.getElementById("s").textContent = s;
+};
+es.onerror = () => { document.getElementById("s").textContent = "Reconnecting"; document.getElementById("lamp").className = "lamp bad"; };
+function tick() {
+  const t = now(), d = new Date(t);
+  document.getElementById("t").textContent = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+  document.getElementById("d").textContent = d.toLocaleDateString([], { timeZone: "UTC", weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  document.getElementById("l").textContent = "Local " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
+  let mode = "FT8";
+  const w = S && S.engine.sources.find((x) => x.kind === "wsjtx");
+  if (w && w.details && w.details.instances && w.details.instances[0] && w.details.instances[0].mode) mode = w.details.instances[0].mode.toUpperCase();
+  const period = mode === "FT4" ? 7.5 : 15;
+  const sec = (t / 1000) % 60, into = sec % period;
+  const bar = document.getElementById("bar");
+  bar.style.width = (into / period * 100).toFixed(2) + "%";
+  const tx = S && S.engine.transmitting;
+  bar.classList.toggle("tx", !!tx);
+  const even = Math.floor(sec / period) % 2 === 0;
+  document.getElementById("p").textContent = `${mode === "FT4" ? "FT4" : "FT8"} ${even ? "even" : "odd"} period, ${into.toFixed(1)} s${tx ? ", transmitting" : ""}`;
+}
+setInterval(tick, 100);
+</script>
+</body>
+</html>

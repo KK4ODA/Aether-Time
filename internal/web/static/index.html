@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Aether Time</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/" aria-label="Aether Time dashboard">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M16 7v9l6 4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="16" cy="16" r="2.4" fill="var(--lamp)"/></svg>
+    <span>Aether Time</span>
+  </a>
+  <nav class="tabs" aria-label="Views">
+    <button type="button" data-view="dash" aria-current="page">Dashboard</button>
+    <button type="button" data-view="settings">Settings</button>
+    <button type="button" data-view="log">Log</button>
+    <a href="/clock" target="_blank" rel="noopener">Wall clock</a>
+  </nav>
+  <button type="button" id="sync-now" class="btn btn-primary">Sync now</button>
+</header>
+
+<div id="banners" class="banners" aria-live="polite"></div>
+
+<main>
+  <!-- Dashboard -->
+  <section id="view-dash" class="view">
+    <section class="instrument" aria-label="Clock and offset">
+      <div class="dial-window">
+        <div class="readout">
+          <p class="time" id="utc" aria-label="UTC time">--:--:--<span class="tenths">.-</span></p>
+          <p class="date"><span id="utc-date">Waiting for the engine</span> <span class="zone">UTC</span></p>
+          <p class="local" id="local"></p>
+        </div>
+        <figure class="cycle" aria-label="FT8 period">
+          <svg id="cycle" viewBox="0 0 140 140" role="img" aria-labelledby="cycle-title">
+            <title id="cycle-title">Position in the current FT8 period</title>
+            <circle class="cycle-track" cx="70" cy="70" r="58"/>
+            <g id="cycle-ticks"></g>
+            <circle class="cycle-arc" id="cycle-arc" cx="70" cy="70" r="58" pathLength="1000" transform="rotate(-90 70 70)"/>
+            <text class="cycle-sec" id="cycle-sec" x="70" y="74" text-anchor="middle">--.-</text>
+            <text class="cycle-mode" id="cycle-mode" x="70" y="94" text-anchor="middle">FT8</text>
+          </svg>
+          <figcaption id="cycle-caption">Even period</figcaption>
+        </figure>
+        <div class="meter">
+          <svg id="meter" viewBox="0 0 640 104" role="img" aria-labelledby="meter-title">
+            <title id="meter-title">Clock error on a logarithmic scale</title>
+          </svg>
+          <p class="meter-readout"><span id="error-text">No measurement yet</span> <span id="uncert-text" class="dim"></span></p>
+        </div>
+      </div>
+      <div class="status-strip">
+        <p class="state" id="state-line" aria-live="polite"><span class="lamp" id="state-lamp"></span><span id="state-text">Starting</span></p>
+        <p id="last-corr" class="dim"></p>
+        <p id="drift-line" class="dim"></p>
+      </div>
+    </section>
+
+    <section class="rack" aria-labelledby="sources-h">
+      <h2 id="sources-h">Time sources</h2>
+      <div id="sources" class="modules"></div>
+    </section>
+
+    <div class="split">
+      <section class="panel" aria-labelledby="hist-h">
+        <div class="panel-head">
+          <h2 id="hist-h">Clock error over time</h2>
+          <label class="inline">Show
+            <select id="hist-range">
+              <option value="15">15 minutes</option>
+              <option value="60" selected>1 hour</option>
+              <option value="360">6 hours</option>
+              <option value="1440">24 hours</option>
+            </select>
+          </label>
+        </div>
+        <div id="chart" class="chart"></div>
+      </section>
+      <section class="panel" aria-labelledby="ft8-h">
+        <h2 id="ft8-h">FT8/FT4 timing</h2>
+        <div id="ft8"></div>
+      </section>
+    </div>
+
+    <div class="split">
+      <section class="panel" aria-labelledby="corr-h">
+        <h2 id="corr-h">Corrections</h2>
+        <div id="corrections"></div>
+      </section>
+      <section class="panel" aria-labelledby="pc-h">
+        <h2 id="pc-h">This computer</h2>
+        <div id="machine"></div>
+        <form id="manual" class="manual">
+          <label for="manual-ms">Adjust the clock by</label>
+          <div class="row">
+            <input id="manual-ms" type="number" step="any" inputmode="decimal" placeholder="milliseconds" required>
+            <span class="unit">ms</span>
+            <button type="submit" class="btn">Apply</button>
+          </div>
+          <p class="help">Positive moves the clock forward. Use this when no time source is available.</p>
+        </form>
+      </section>
+    </div>
+  </section>
+
+  <!-- Settings -->
+  <section id="view-settings" class="view" hidden>
+    <div class="settings">
+      <nav class="settings-nav" id="settings-nav" aria-label="Settings sections"></nav>
+      <form id="settings-form" class="settings-form" novalidate></form>
+    </div>
+    <div class="savebar">
+      <p id="save-msg" role="status"></p>
+      <button type="button" id="settings-reset" class="btn">Discard changes</button>
+      <button type="button" id="settings-save" class="btn btn-primary">Save settings</button>
+    </div>
+  </section>
+
+  <!-- Log -->
+  <section id="view-log" class="view" hidden>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Activity log</h2>
+        <button type="button" id="log-refresh" class="btn">Refresh</button>
+      </div>
+      <div id="log"></div>
+    </section>
+  </section>
+</main>
+
+<footer class="foot" id="foot"></footer>
+<script src="app.js"></script>
+</body>
+</html>

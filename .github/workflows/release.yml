@@ -1,0 +1,43 @@
+name: release
+
+# Push a tag like v1.2.0 (or v1.3.0-beta.1 for the beta channel) to publish.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+      - run: scripts/build.sh "${GITHUB_REF_NAME#v}"
+      - name: Sign checksums
+        env:
+          AETHER_SIGNING_KEY: ${{ secrets.AETHER_SIGNING_KEY }}
+        run: |
+          if [ -n "$AETHER_SIGNING_KEY" ]; then
+            go run ./cmd/aether-sign sign dist/checksums.txt
+            go run ./cmd/aether-sign verify dist/checksums.txt
+          elif [ -s internal/updater/signing_key.pub ]; then
+            echo "::error::A signing public key is committed but the AETHER_SIGNING_KEY secret is missing; installed copies would refuse this release."
+            exit 1
+          else
+            echo "::warning::Release is unsigned. Run 'go run ./cmd/aether-sign keygen' to enable signed updates."
+          fi
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=(dist/*.tar.gz dist/*.zip dist/checksums.txt)
+          [ -f dist/checksums.txt.sig ] && files+=(dist/checksums.txt.sig)
+          pre=()
+          case "$GITHUB_REF_NAME" in *-*) pre=(--prerelease) ;; esac
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" "${pre[@]}" \
+            --title "Aether Time ${GITHUB_REF_NAME#v}" --generate-notes

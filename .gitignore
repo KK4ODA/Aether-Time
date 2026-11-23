@@ -1,0 +1,5 @@
+/dist/
+/aether-time
+/aether-time.exe
+*.test
+*.out
