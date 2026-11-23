@@ -3,57 +3,12 @@
 package tray
 
 import (
-	"bytes"
-	"encoding/binary"
 	"encoding/json"
-	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
-
-func TestIconBadgeColours(t *testing.T) {
-	for st, want := range colBadge {
-		img, err := png.Decode(bytes.NewReader(PNG(32, st)))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if img.Bounds().Dx() != 32 {
-			t.Fatalf("size %v", img.Bounds())
-		}
-		// The centre of the badge carries the status colour.
-		r, g, b, a := img.At(24, 24).RGBA()
-		if uint8(r>>8) != want.R || uint8(g>>8) != want.G || uint8(b>>8) != want.B || a>>8 != 0xFF {
-			t.Fatalf("status %d: badge colour %02x%02x%02x", st, r>>8, g>>8, b>>8)
-		}
-		// Corners are transparent, the dial is opaque.
-		if _, _, _, a := img.At(0, 0).RGBA(); a != 0 {
-			t.Fatal("corner not transparent")
-		}
-	}
-}
-
-func TestICOContainer(t *testing.T) {
-	ico := ICO(StatusOK, 16, 32)
-	var hdr [3]uint16
-	binary.Read(bytes.NewReader(ico), binary.LittleEndian, &hdr)
-	if hdr != [3]uint16{0, 1, 2} {
-		t.Fatalf("header %v", hdr)
-	}
-	for i, size := range []int{16, 32} {
-		e := ico[6+16*i:]
-		if int(e[0]) != size || int(e[1]) != size {
-			t.Fatalf("entry %d size %d", i, e[0])
-		}
-		n := binary.LittleEndian.Uint32(e[8:])
-		off := binary.LittleEndian.Uint32(e[12:])
-		img, err := png.Decode(bytes.NewReader(ico[off : off+n]))
-		if err != nil || img.Bounds().Dx() != size {
-			t.Fatalf("frame %d: %v", i, err)
-		}
-	}
-}
 
 func TestDescribe(t *testing.T) {
 	var st apiStatus

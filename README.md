@@ -56,32 +56,43 @@ empty cell means the feature isn't mentioned there.
 
 ## Getting started
 
+### Windows
+
+Download `AetherTime-Setup-<version>.exe` from the
+[releases page](https://github.com/KK4ODA/Aether-Time/releases) and run it.
+The installer:
+
+- puts Aether Time in Program Files (one installer for x64 and ARM64 PCs);
+- installs and starts the service, which has permission to set the clock;
+- adds Aether Time and its wall clock to the Start menu, plus an optional
+  desktop shortcut;
+- shows the tray icon when you log in (optional);
+- can stop the Windows Time service from also setting the clock (optional,
+  undone when you uninstall).
+
+Windows SmartScreen may warn that the installer is from an unknown publisher,
+because it isn't code-signed yet. Choose **More info**, then **Run anyway**.
+To remove Aether Time, use **Settings → Apps → Installed apps**; it asks
+whether to keep your settings.
+
+For a silent install, run the installer with `/S`.
+
+### macOS and Linux
+
 1. Download the archive for your system from the
    [releases page](https://github.com/KK4ODA/Aether-Time/releases) and unpack it.
-2. Install it as a service. The service starts at boot and has permission to
-   set the clock.
-
-   Windows (Command Prompt opened with **Run as administrator**):
-
-   ```bash
-   aether-time.exe service install --start
-   ```
-
-   macOS and Linux:
+2. Install the service. It starts at boot and has permission to set the clock:
 
    ```bash
    sudo ./aether-time service install --start
    ```
 
-3. Start `aether-time` from your desktop (double-click it on Windows). An icon
-   appears in the system tray or menu bar; choose **Start at login** in its
-   menu to keep it there. The dashboard is at <http://127.0.0.1:8123/>.
+3. Start `aether-time` from your desktop. An icon appears in the menu bar or
+   tray; choose **Start at login** in its menu to keep it there.
 
-On Windows you can skip step 2: double-click `aether-time.exe` and use
-**Install service** on the dashboard. Windows asks for permission once.
-
-Running `aether-time` without the service also works, but it can only measure
-until it's started as administrator or root.
+The dashboard is at <http://127.0.0.1:8123/> on every system. Running
+`aether-time` without the service also works, but it can only measure until
+it's started as administrator or root.
 
 ### The tray icon
 
@@ -243,9 +254,16 @@ go build ./cmd/aether-time
 scripts/build.sh 0.1.0 && scripts/checksums.sh
 ```
 
-`scripts/build.sh` cross-compiles every platform into `dist/`, and
-`scripts/checksums.sh` writes `dist/checksums.txt`. macOS builds include the
-menu-bar icon only when built on a Mac.
+`scripts/build.sh` cross-compiles every platform into `dist/`. When NSIS
+(`makensis`) is installed it also builds the Windows installer from
+`installer/aether-time.nsi`. `scripts/checksums.sh` writes
+`dist/checksums.txt`. macOS builds include the menu-bar icon only when built
+on a Mac.
+
+The Windows icon, version details and manifest come from
+`go run ./cmd/aether-winres -syso cmd/aether-time -assets installer`, which
+also draws the installer's icon and side picture. The release build stamps
+the real version in automatically.
 
 ## Not done yet
 
@@ -253,9 +271,10 @@ menu-bar icon only when built on a Mac.
   Trimble units set to NMEA.
 - Pop-up notifications on each correction. The tray badge and the dashboard
   show the state instead.
-- Signed installers. Windows SmartScreen and macOS Gatekeeper warn about
+- Code-signed downloads. Windows SmartScreen and macOS Gatekeeper warn about
   unsigned downloads until code-signing certificates are added to the release
   workflow.
+- A macOS app bundle and a Linux menu entry with the icon.
 - NTS (authenticated NTP) and decoding WWV, CHU or DCF77 audio.
 
 ## License

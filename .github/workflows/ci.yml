@@ -31,5 +31,61 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq nsis
       - run: scripts/build.sh 0.0.0-ci
       - run: scripts/checksums.sh
+
+  # Builds the installer and runs it for real on Windows: silent install,
+  # check the service, shortcuts and dashboard, then silent uninstall.
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build the program
+        run: go build -o aether-time.exe ./cmd/aether-time
+      - name: The program starts and carries its icon and version details
+        run: |
+          ./aether-time.exe version
+          if ($LASTEXITCODE -ne 0) { throw "aether-time.exe failed to start" }
+          $v = (Get-Item ./aether-time.exe).VersionInfo
+          Write-Host "ProductName=$($v.ProductName) FileDescription=$($v.FileDescription) Company=$($v.CompanyName)"
+          if ($v.ProductName -ne 'Aether Time') { throw "version information missing" }
+      - name: Build the installer
+        run: |
+          $mk = (Get-Command makensis -ErrorAction SilentlyContinue).Source
+          if (-not $mk) { $mk = "${env:ProgramFiles(x86)}\NSIS\makensis.exe" }
+          if (-not (Test-Path $mk)) { choco install nsis --no-progress -y | Out-Null }
+          & $mk -WX -V2 "-DVERSION=0.0.0-ci" "-DVERSION_NUM=0.0.0.0" "-DEXE_AMD64=$PWD\aether-time.exe" "-DOUTFILE=$PWD\AetherTime-Setup-ci.exe" installer/aether-time.nsi
+          if ($LASTEXITCODE -ne 0) { throw "makensis failed" }
+      - name: Silent install
+        run: |
+          $p = Start-Process -FilePath .\AetherTime-Setup-ci.exe -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+      - name: Check the installation
+        run: |
+          $exe = "$env:ProgramFiles\AetherTime\aether-time.exe"
+          if (-not (Test-Path $exe)) { throw "program not installed" }
+          $svc = Get-Service aether-time
+          if ($svc.Status -ne 'Running') { throw "service is $($svc.Status)" }
+          if (-not (Test-Path "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Aether Time.lnk")) { throw "no Start menu shortcut" }
+          if (-not (Test-Path "$env:PUBLIC\Desktop\Aether Time.lnk")) { throw "no desktop shortcut" }
+          $u = Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\AetherTime'
+          Write-Host "Installed apps entry: $($u.DisplayName) $($u.DisplayVersion) by $($u.Publisher)"
+          $r = $null
+          for ($i = 0; $i -lt 30 -and -not $r; $i++) {
+            try { $r = Invoke-RestMethod http://127.0.0.1:8123/api/ping } catch { Start-Sleep 1 }
+          }
+          if ($r.app -ne 'aether-time') { throw "the service's dashboard is not answering" }
+          & $exe status
+      - name: Silent uninstall
+        run: |
+          $dir = "$env:ProgramFiles\AetherTime"
+          $p = Start-Process -FilePath "$dir\uninstall.exe" -ArgumentList '/S', "_?=$dir" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "uninstaller exit code $($p.ExitCode)" }
+          if (Get-Service aether-time -ErrorAction SilentlyContinue) { throw "service still installed" }
+          if (Test-Path "$dir\aether-time.exe") { throw "program file still present" }
+          if (Test-Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\AetherTime') { throw "still listed in installed apps" }
+          Write-Host "uninstalled cleanly"

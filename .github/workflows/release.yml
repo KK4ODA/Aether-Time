@@ -23,7 +23,7 @@ jobs:
     strategy:
       matrix:
         include:
-          # Windows and Linux cross-compile from Linux.
+          # Windows and Linux cross-compile from Linux; NSIS builds the Windows installer.
           - runner: ubuntu-latest
             targets: linux/amd64 linux/arm64 linux/arm windows/amd64 windows/arm64
           # The macOS menu-bar icon needs Apple's toolchain.
@@ -35,6 +35,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Install NSIS for the Windows installer
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq nsis
       - run: scripts/build.sh "${GITHUB_REF_NAME#v}" ${{ matrix.targets }}
       - uses: actions/upload-artifact@v4
         with:
@@ -79,7 +82,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          files=(dist/*.tar.gz dist/*.zip dist/checksums.txt)
+          shopt -s nullglob
+          files=(dist/*.tar.gz dist/*.zip dist/*.exe dist/checksums.txt)
           [ -f dist/checksums.txt.sig ] && files+=(dist/checksums.txt.sig)
           pre=()
           case "$GITHUB_REF_NAME" in *-*) pre=(--prerelease) ;; esac

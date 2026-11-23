@@ -138,6 +138,9 @@ func (a *App) Run(ctx context.Context) error {
 	a.mu.Unlock()
 
 	a.log.Info("starting", "version", version.String(), "config", a.opts.ConfigPath)
+	if a.opts.Service {
+		noteInstalledVersion()
+	}
 	if ok, why := a.clk.CanAdjust(); !ok {
 		a.log.Warn("cannot set the clock; running in monitor mode", "how_to_fix", why)
 	}
