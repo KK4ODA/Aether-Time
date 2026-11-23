@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package app wires configuration, logging, the engine, the updater and the
 // web dashboard together.
 package app

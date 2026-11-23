@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Builds Aether Time release archives into dist/.
 #
 #   scripts/build.sh 1.2.3                      every platform
@@ -46,7 +47,7 @@ for t in "${TARGETS[@]}"; do
     GOOS="${os}" GOARCH="${arch}" GOARM=7 \
     go build -trimpath -ldflags "${LDFLAGS}" -o "${dir}/${bin}" ./cmd/aether-time
   cp README.md "${dir}/"
-  [ -f LICENSE ] && cp LICENSE "${dir}/"
+  cp LICENSE THIRD_PARTY_NOTICES.md "${dir}/"
   if [ "${os}" = windows ]; then
     (cd dist && zip -qr "${name}.zip" "${name}")
   else

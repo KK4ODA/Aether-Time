@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 @font-face { font-family: "B612"; src: url(fonts/b612-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "B612"; src: url(fonts/b612-latin-700-normal.woff2) format("woff2"); font-weight: 700; font-display: swap; }
 @font-face { font-family: "B612 Mono"; src: url(fonts/b612-mono-latin-400-normal.woff2) format("woff2"); font-weight: 400; font-display: swap; }

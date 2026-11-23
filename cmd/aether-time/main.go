@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Command aether-time keeps the computer clock exact using internet time (NTP,
 // HTTPS), GPS receivers and the timing of FT8/FT4 decodes, online or offline.
 package main
@@ -76,6 +78,7 @@ func main() {
 		err = cmdConfig(args)
 	case "version", "--version", "-v":
 		fmt.Println(version.String())
+		fmt.Println(version.Notice)
 	case "help", "--help", "-h":
 		fmt.Printf(usage, config.ConfigPath())
 	default:

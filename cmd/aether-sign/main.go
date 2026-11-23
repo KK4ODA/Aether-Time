@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Command aether-sign manages the Ed25519 key that signs Aether Time releases.
 //
 //	aether-sign keygen

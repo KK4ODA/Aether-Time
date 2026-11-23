@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package logbuf provides a slog handler that also keeps recent records in
 // memory for the dashboard's log view.
 package logbuf

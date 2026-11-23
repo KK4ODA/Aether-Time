@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package conflicts detects other time-synchronization software that would
 // fight Aether Time over the system clock.
 package conflicts

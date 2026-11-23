@@ -258,5 +258,18 @@ menu-bar icon only when built on a Mac.
   workflow.
 - NTS (authenticated NTP) and decoding WWV, CHU or DCF77 audio.
 
-The fonts in the dashboard are B612 and B612 Mono, released under the SIL Open
-Font License; see `internal/web/static/fonts/OFL.txt`.
+## License
+
+Copyright (C) 2026 KK4ODA and contributors.
+
+Aether Time is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. It is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See [LICENSE](LICENSE) for the full text.
+
+Contributions are accepted under the same license. The libraries and fonts
+built into Aether Time keep their own licenses, listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); run
+`scripts/third-party-notices.sh` after changing dependencies.

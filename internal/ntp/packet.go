@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package ntp implements the subset of NTPv4 (RFC 5905) needed for an SNTP
 // client and a small, well-behaved LAN time server.
 package ntp

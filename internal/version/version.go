@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package version holds build metadata injected at link time.
 package version
 
@@ -18,6 +20,12 @@ const AppName = "Aether Time"
 
 // BinaryName is the executable name (without extension).
 const BinaryName = "aether-time"
+
+// Notice is the license notice shown by "aether-time version".
+const Notice = `Copyright (C) 2026 KK4ODA and contributors.
+License GPL-3.0-or-later <https://www.gnu.org/licenses/gpl-3.0.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.`
 
 // String returns a human readable version line.
 func String() string {

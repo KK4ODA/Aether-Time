@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Writes dist/checksums.txt (SHA-256 of every release archive), the file the
 # updater verifies and the release signature covers.
 set -euo pipefail

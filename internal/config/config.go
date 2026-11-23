@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package config defines Aether Time's configuration, its defaults, and
 // where configuration and state files live on each operating system.
 package config

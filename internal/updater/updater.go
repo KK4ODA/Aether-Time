@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package updater keeps Aether Time up to date from GitHub Releases.
 //
 // Every release publishes per-platform archives, a checksums.txt file listing

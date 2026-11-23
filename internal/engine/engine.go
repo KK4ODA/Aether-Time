@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package engine fuses the time sources, decides when and how to correct the
 // system clock, learns the clock's drift for holdover, and serves the
 // disciplined time to the LAN.

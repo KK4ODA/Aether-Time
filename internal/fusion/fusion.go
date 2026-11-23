@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package fusion combines several clock-offset estimates into one, rejecting
 // "falsetickers" (sources that disagree with the majority) using an interval
 // intersection in the spirit of Marzullo's algorithm, which NTP also uses.

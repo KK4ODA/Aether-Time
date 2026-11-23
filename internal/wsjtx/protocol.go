@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package wsjtx encodes and decodes the WSJT-X UDP message protocol
 // (NetworkMessage.hpp), which JTDX and MSHV also speak. Values are Qt
 // QDataStream big-endian encodings.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package nmea parses the NMEA 0183 sentences that carry time and position:
 // RMC, ZDA, GGA, GLL and GSV, from any talker (GP, GN, GL, GA, BD, ...).
 package nmea

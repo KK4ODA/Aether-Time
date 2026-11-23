@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package tray shows Aether Time in the system tray (Windows notification
 // area, macOS menu bar, Linux StatusNotifier panels). The tray talks to the
 // engine through the local API, so it works both when the engine runs in the

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package web serves the dashboard and the JSON API.
 package web
 

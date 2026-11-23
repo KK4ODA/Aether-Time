@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package clock reads and adjusts the operating system clock.
 package clock
 

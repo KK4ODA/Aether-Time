@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package sources contains the time references Aether Time can learn the
 // correct time from: NTP, HTTPS, GPS receivers (NMEA, gpsd) and the timing of
 // FT8/FT4 decodes reported by WSJT-X, JTDX and MSHV.

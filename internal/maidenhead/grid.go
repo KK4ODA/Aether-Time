@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package maidenhead converts coordinates to Maidenhead grid locators.
 package maidenhead
 

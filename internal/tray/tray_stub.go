@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 //go:build !(windows || (linux && !android) || (darwin && cgo))
 
 package tray

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package svc installs and runs Aether Time as a system service: a Windows
 // service, a systemd unit on Linux, or a launchd daemon on macOS. Running as a
 // service gives it the right to set the clock and starts it at boot.

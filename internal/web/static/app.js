@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 "use strict";
 
 /* ---------- helpers ---------- */
@@ -459,7 +460,9 @@ function renderBanners() {
 
 function renderFoot() {
   const i = S.info;
-  const html = `Aether Time ${esc(i.version)} for ${esc(i.os)}/${esc(i.arch)}. Settings file: ${esc(i.config_path)}`;
+  const html = `Aether Time ${esc(i.version)} for ${esc(i.os)}/${esc(i.arch)}. Free software under the
+    <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener">GNU GPL v3 or later</a>, with no warranty.
+    Settings file: ${esc(i.config_path)}`;
   const f = $("#foot");
   if (f.dataset.html !== html) { f.innerHTML = html; f.dataset.html = html; }
 }
